@@ -1,0 +1,161 @@
+import { afterAll, describe, expect, it } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { executeTool, resolvePluginFactory } from "../../run-tool.ts";
+
+// ---------------------------------------------------------------------------
+// Stub plugin factory
+// ---------------------------------------------------------------------------
+
+const STUB_RESULT = "stub-tool-result-ok";
+
+async function writeStubPlugin(dir: string): Promise<string> {
+  const path = join(dir, "stub-plugin.ts");
+  await writeFile(
+    path,
+    `
+export const StubPlugin = async () => ({
+  tool: {
+    "stub-tool": {
+      execute: async (_args: Record<string, unknown>) =>
+        ${JSON.stringify(STUB_RESULT)},
+    },
+  },
+});
+`,
+  );
+  return path;
+}
+
+// ---------------------------------------------------------------------------
+// Test lifecycle
+// ---------------------------------------------------------------------------
+
+let tmpDir: string;
+let stubPluginPath: string;
+
+// We can't use beforeAll with async in bun:test at top level cleanly,
+// so we create the dir once via a helper and reuse it across tests.
+async function getStubPath(): Promise<string> {
+  if (stubPluginPath) return stubPluginPath;
+  tmpDir = await mkdtemp(join(tmpdir(), "mcp-shim-test-"));
+  stubPluginPath = await writeStubPlugin(tmpDir);
+  return stubPluginPath;
+}
+
+afterAll(async () => {
+  if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// resolvePluginFactory
+// ---------------------------------------------------------------------------
+
+describe("resolvePluginFactory", () => {
+  it("finds a *Plugin named export", () => {
+    const factory = () => ({ tool: {} });
+    const mod = { SomePlugin: factory, otherExport: 42 };
+    expect(resolvePluginFactory(mod)).toBe(factory);
+  });
+
+  it("falls back to default export if no *Plugin export", () => {
+    const factory = () => ({ tool: {} });
+    const mod = { default: factory, helper: "irrelevant" };
+    expect(resolvePluginFactory(mod)).toBe(factory);
+  });
+
+  it("prefers *Plugin over default when both present", () => {
+    const namedFactory = () => ({ tool: {} });
+    const defaultFactory = () => ({ tool: {} });
+    const mod = { MyPlugin: namedFactory, default: defaultFactory };
+    expect(resolvePluginFactory(mod)).toBe(namedFactory);
+  });
+
+  it("throws when no *Plugin export and no default", () => {
+    expect(() => resolvePluginFactory({ notAPlugin: 42 })).toThrow(
+      /No plugin factory found/,
+    );
+  });
+
+  it("throws and lists available exports in error message", () => {
+    const mod = { foo: 1, bar: 2 };
+    expect(() => resolvePluginFactory(mod)).toThrow(/foo.*bar|bar.*foo/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// executeTool
+// ---------------------------------------------------------------------------
+
+describe("executeTool", () => {
+  it("invokes the correct tool and returns its output", async () => {
+    const path = await getStubPath();
+    const result = await executeTool(path, "stub-tool", {});
+    expect(result).toBe(STUB_RESULT);
+  });
+
+  it("passes args through to the tool", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-args-"));
+    const p = join(dir, "args-plugin.ts");
+    await writeFile(
+      p,
+      `export const ArgsPlugin = async () => ({
+  tool: {
+    echo: {
+      execute: async (args: Record<string, unknown>) => JSON.stringify(args),
+    },
+  },
+});`,
+    );
+    const result = await executeTool(p, "echo", { x: 1, y: "hello" });
+    if (typeof result !== "string") {
+      throw new Error("echo tool should return a plain string result");
+    }
+    const parsed = JSON.parse(result);
+    expect(parsed).toEqual({ x: 1, y: "hello" });
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("throws on unknown tool name", async () => {
+    const path = await getStubPath();
+    await expect(executeTool(path, "nonexistent-tool", {})).rejects.toThrow(
+      /Unknown tool/,
+    );
+  });
+
+  it("applies plugin tool hooks and preserves structured output", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-hooks-"));
+    const p = join(dir, "hooked-plugin.ts");
+    await writeFile(
+      p,
+      `export const HookedPlugin = async () => ({
+  tool: {
+    todowrite: {
+      execute: async () => JSON.stringify([{ content: "test", status: "pending", priority: "high" }]),
+    },
+  },
+  "tool.execute.after": async (input, output) => {
+    if (input.tool !== "todowrite") return;
+    output.title = "1 todos";
+    output.metadata = {
+      todos: [{ content: "test", status: "pending", priority: "high" }],
+    };
+  },
+});`,
+    );
+    const result = await executeTool(p, "todowrite", {});
+    expect(result).toEqual({
+      title: "1 todos",
+      output: JSON.stringify(
+        [{ content: "test", status: "pending", priority: "high" }],
+        null,
+        0,
+      ),
+      metadata: {
+        todos: [{ content: "test", status: "pending", priority: "high" }],
+      },
+    });
+    await rm(dir, { recursive: true, force: true });
+  });
+});
