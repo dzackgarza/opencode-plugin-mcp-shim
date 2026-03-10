@@ -83,9 +83,9 @@ export async function executeTool(
     typeof args[MCP_SESSION_ID_ARG] === "string" &&
     (args[MCP_SESSION_ID_ARG] as string).trim().length > 0
       ? (args[MCP_SESSION_ID_ARG] as string).trim()
-      : "mcp-shim-session";
-  const messageID = "mcp-shim-message";
-  const callID = `mcp-shim-${toolName}`;
+      : "opencode-plugin-mcp-shim-session";
+  const messageID = "opencode-plugin-mcp-shim-message";
+  const callID = `opencode-plugin-mcp-shim-${toolName}`;
   const pendingState: Partial<ToolExecutionOutput> = {};
 
   const client = {

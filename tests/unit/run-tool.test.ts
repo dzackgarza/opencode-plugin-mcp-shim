@@ -40,7 +40,7 @@ let stubPluginPath: string;
 // so we create the dir once via a helper and reuse it across tests.
 async function getStubPath(): Promise<string> {
   if (stubPluginPath) return stubPluginPath;
-  tmpDir = await mkdtemp(join(tmpdir(), "mcp-shim-test-"));
+  tmpDir = await mkdtemp(join(tmpdir(), "opencode-plugin-mcp-shim-test-"));
   stubPluginPath = await writeStubPlugin(tmpDir);
   return stubPluginPath;
 }
@@ -97,7 +97,7 @@ describe("executeTool", () => {
   });
 
   it("passes args through to the tool", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-args-"));
+    const dir = await mkdtemp(join(tmpdir(), "opencode-plugin-mcp-shim-args-"));
     const p = join(dir, "args-plugin.ts");
     await writeFile(
       p,
@@ -119,7 +119,7 @@ describe("executeTool", () => {
   });
 
   it("loads a default-export plugin from a real file", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-default-export-"));
+    const dir = await mkdtemp(join(tmpdir(), "opencode-plugin-mcp-shim-default-export-"));
     const p = join(dir, "default-plugin.ts");
     await writeFile(
       p,
@@ -141,7 +141,7 @@ describe("executeTool", () => {
   });
 
   it("resolves relative plugin paths from the current working directory", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-relative-"));
+    const dir = await mkdtemp(join(tmpdir(), "opencode-plugin-mcp-shim-relative-"));
     const p = join(dir, "relative-plugin.ts");
     await writeFile(
       p,
@@ -176,7 +176,7 @@ describe("executeTool", () => {
   });
 
   it("applies plugin tool hooks and preserves structured output", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-hooks-"));
+    const dir = await mkdtemp(join(tmpdir(), "opencode-plugin-mcp-shim-hooks-"));
     const p = join(dir, "hooked-plugin.ts");
     await writeFile(
       p,
@@ -213,7 +213,7 @@ describe("executeTool", () => {
 
 describe("run-tool CLI", () => {
   it("prints default-export plugin output", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-cli-"));
+    const dir = await mkdtemp(join(tmpdir(), "opencode-plugin-mcp-shim-cli-"));
     const p = join(dir, "cli-plugin.ts");
     await writeFile(
       p,
@@ -233,7 +233,7 @@ describe("run-tool CLI", () => {
       "bun",
       [
         "run",
-        "/home/dzack/opencode-plugins/mcp-shim/run-tool.ts",
+        "./opencode-plugin-mcp-shim/run-tool.ts",
         "./cli-plugin.ts",
         "echo",
         '{"ok":true}',
@@ -253,7 +253,7 @@ describe("run-tool CLI", () => {
       "bun",
       [
         "run",
-        "/home/dzack/opencode-plugins/mcp-shim/run-tool.ts",
+        "./opencode-plugin-mcp-shim/run-tool.ts",
         "./missing-plugin.ts",
         "echo",
         "{}",

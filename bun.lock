@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "mcp-shim",
+      "name": "opencode-plugin-mcp-shim",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "^5",

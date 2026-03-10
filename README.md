@@ -1,15 +1,14 @@
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I57UKJ8)
 
-# mcp-shim
+# opencode-plugin-mcp-shim
 
-`mcp-shim` provides a shared TypeScript helper for invoking plugin tools from FastMCP wrappers.
+`opencode-plugin-mcp-shim` provides a shared TypeScript helper for invoking plugin tools from FastMCP wrappers.
 
 This package remains internal and exposes no tool names to agents.
 
 ## Installation
 
 ```bash
-cd /home/dzack/opencode-plugins/mcp-shim
+cd ./opencode-plugin-mcp-shim
 just install
 ```
 
