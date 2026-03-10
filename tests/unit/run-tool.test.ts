@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -117,6 +118,56 @@ describe("executeTool", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  it("loads a default-export plugin from a real file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-default-export-"));
+    const p = join(dir, "default-plugin.ts");
+    await writeFile(
+      p,
+      `export default async function DefaultPlugin() {
+  return {
+    tool: {
+      echo: {
+        async execute() {
+          return "default-export-ok";
+        },
+      },
+    },
+  };
+}`,
+    );
+    const result = await executeTool(p, "echo", {});
+    expect(result).toBe("default-export-ok");
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("resolves relative plugin paths from the current working directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-relative-"));
+    const p = join(dir, "relative-plugin.ts");
+    await writeFile(
+      p,
+      `export async function RelativePlugin() {
+  return {
+    tool: {
+      echo: {
+        async execute() {
+          return "relative-path-ok";
+        },
+      },
+    },
+  };
+}`,
+    );
+    const originalCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const result = await executeTool("./relative-plugin.ts", "echo", {});
+      expect(result).toBe("relative-path-ok");
+    } finally {
+      process.chdir(originalCwd);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("throws on unknown tool name", async () => {
     const path = await getStubPath();
     await expect(executeTool(path, "nonexistent-tool", {})).rejects.toThrow(
@@ -157,5 +208,62 @@ describe("executeTool", () => {
       },
     });
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("run-tool CLI", () => {
+  it("prints default-export plugin output", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-shim-cli-"));
+    const p = join(dir, "cli-plugin.ts");
+    await writeFile(
+      p,
+      `export default async function CliPlugin() {
+  return {
+    tool: {
+      echo: {
+        async execute(args) {
+          return JSON.stringify(args);
+        },
+      },
+    },
+  };
+}`,
+    );
+    const result = spawnSync(
+      "bun",
+      [
+        "run",
+        "/home/dzack/opencode-plugins/mcp-shim/run-tool.ts",
+        "./cli-plugin.ts",
+        "echo",
+        '{"ok":true}',
+      ],
+      {
+        cwd: dir,
+        encoding: "utf8",
+      },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe('{"ok":true}');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("returns a non-zero exit code for a missing plugin file", () => {
+    const result = spawnSync(
+      "bun",
+      [
+        "run",
+        "/home/dzack/opencode-plugins/mcp-shim/run-tool.ts",
+        "./missing-plugin.ts",
+        "echo",
+        "{}",
+      ],
+      {
+        cwd: tmpdir(),
+        encoding: "utf8",
+      },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Error:");
   });
 });

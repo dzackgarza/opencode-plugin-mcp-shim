@@ -7,6 +7,9 @@
  *   bun run run-tool.ts ../improved-webtools/src/index.ts webfetch '{"url":"https://example.com"}'
  */
 
+import { isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
 type ToolArgs = Record<string, unknown>;
 const MCP_SESSION_ID_ARG = "__mcp_session_id";
 
@@ -30,6 +33,22 @@ type PluginHooks = {
     args: ToolArgs;
   }, output: ToolExecutionOutput) => Promise<void>;
 };
+
+function resolvePluginEntrypointSpecifier(pluginEntrypoint: string): string {
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(pluginEntrypoint)) {
+    return pluginEntrypoint;
+  }
+
+  if (
+    pluginEntrypoint.startsWith("./") ||
+    pluginEntrypoint.startsWith("../") ||
+    isAbsolute(pluginEntrypoint)
+  ) {
+    return pathToFileURL(resolve(pluginEntrypoint)).href;
+  }
+
+  return pluginEntrypoint;
+}
 
 export function resolvePluginFactory(
   pluginModule: Record<string, any>,
@@ -56,7 +75,9 @@ export async function executeTool(
   toolName: string,
   args: ToolArgs,
 ): Promise<string | ToolExecutionOutput> {
-  const pluginModule = await import(pluginEntrypoint);
+  const pluginModule = await import(
+    resolvePluginEntrypointSpecifier(pluginEntrypoint),
+  );
   const pluginFactory = resolvePluginFactory(pluginModule);
   const sessionID =
     typeof args[MCP_SESSION_ID_ARG] === "string" &&
