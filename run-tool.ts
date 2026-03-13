@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * Shared tool executor for FastMCP wrappers.
  *

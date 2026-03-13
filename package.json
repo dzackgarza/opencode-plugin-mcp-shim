@@ -2,6 +2,7 @@
   "name": "@dzackgarza/opencode-plugin-mcp-shim",
   "version": "1.0.0",
   "type": "module",
+  "bin": "run-tool.ts",
   "description": "Shared TypeScript shim for MCP tool execution",
   "main": "run-tool.ts",
   "scripts": {
